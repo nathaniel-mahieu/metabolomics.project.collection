@@ -1,0 +1,124 @@
+```{r setup, cache=FALSE, include=FALSE}
+opts_chunk$set(fig.width=11, fig.height=7, fig.align="center", message=F, warning=F)
+```
+
+# QC Overview of a Roughly Grouped and Filtered Sample
+```{r, results='hide'}
+library(warpgroup)
+library(ggplot2)
+library(reshape2)
+```
+
+```{r, cache=TRUE, warning=FALSE}
+xs
+min.samps
+n.samps = length(xs@filepaths)
+if (!exists("samp.order")) { samp.order = seq(n.samps) }
+samp.order
+```
+
+# Find all groups which are "nice" One peak each sample
+
+```{r group_comp}
+lens = sapply(xs@groupidx, length)
+
+sample.pns = plyr::count(xs@peaks[,"sample"])
+pn.breaks = c(0,cumsum(sample.pns[,"freq"]))
+pn.labels = sample.pns[,1]
+
+samps = sapply(xs@groupidx, function(x) {
+  cut(x, pn.breaks, pn.labels)
+  })
+samps.nums = sapply(samps, function(x) {length(unique(x))})
+#samps.index = sapply(samps, function(x) {any(x == 5)})
+
+par(mfcol = c(1,2))
+hist(samps.nums)
+hist(lens, breaks = 300, xlim = c(0, n.samps * 30))
+
+good.gs = which(samps.nums >= min.samps & lens <= n.samps)
+```
+
+# RT Aggregation
+```{r rt_ag}
+rt.a = array(numeric(), dim=c(length(good.gs), n.samps))
+mz.a = array(numeric(), dim=c(length(good.gs), n.samps))
+for (i in seq_along(good.gs)) {
+  ps = xs@peaks[xs@groupidx[[good.gs[i]]],]
+  ps2 = merge(data.frame(sample = seq(n.samps)), ps, all.x = T)
+  
+  ps2 = ps2[!duplicated(ps2[,"sample"]),]
+  
+  rt.a[i,] = ps2[,"rt"]
+  mz.a[i,] = ps2[,"mz"]
+}
+
+g.rts = aaply(rt.a, 1, mean, na.rm=T)
+rt.ad = aaply(rt.a, 1, function(x) {outer(x,x,"-")})
+rt.ad.minchain = aaply(abs(rt.ad), c(1), function(x) {
+  x = as.numeric(x)
+  max(diff(x[order(x)]), na.rm=T)
+})
+group.rtbins = cut(g.rts, 200)
+
+rt.drifts = laply(unique(group.rtbins), function(x) {
+  gs = which(group.rtbins == x)
+  
+  colMeans(rt.a[gs,1] - rt.a[gs,,drop=F], na.rm=T)
+  })
+```
+
+# MZ Aggregation
+```{r mz_ag}
+g.mzs = aaply(mz.a, 1, mean, na.rm=T)
+mz.ad = aaply(mz.a, 1, function(x) { outer(x,x,"-") })
+ppm.ad = aaply(mz.a, 1, function(x) { outer(x,x,"-") / x * 1E6 })
+mz.ad.minchain = aaply(abs(ppm.ad), c(1), function(x) {
+  x = as.numeric(x)
+  max(diff(x[order(x)]), na.rm=T)
+})
+
+group.mzbins = cut(g.rts, 200)
+
+mz.drifts = laply(unique(group.rtbins), function(x) {
+  gs = which(group.mzbins == x)
+  
+  colMeans((mz.a[gs,1] - mz.a[gs,,drop=F]) / mz.a[gs,,drop=F] * 1E6, na.rm=T)
+})
+```
+
+
+# RT drift between samples
+```{r rt_drift}
+par(mfrow=c(3,6), xaxs='i', yaxs='i', mar = c(0.5, 0.5, 0.5, 0.5))
+foo = aaply(rt.ad[,1,samp.order], 1, function(x) { sum(!is.na(x))  })
+for(i in 1:18) { plot(rt.ad[sample(which(foo == n.samps),1),1,samp.order], type="l", xaxt="n") }
+ggplot(melt(rt.drifts), aes(x = Var1, y=value, colour=factor(Var2))) + geom_line() + theme_nate()
+```
+
+## Estimate max RT drift windows
+```{r rt_windows}
+par(mfrow=c(1,2))
+plot(rt.ad.minchain, g.rts)
+hist(rt.ad.minchain)
+c(quantile(rt.ad.minchain, .01), quantile(rt.ad.minchain, .99))
+```
+
+
+# MZ drift between samples
+```{r mz_drift}
+par(mfrow=c(3,6), xaxs='i', yaxs='i', mar = c(0.5, 0.5, 0.5, 0.5))
+foo = aaply(mz.ad[,1,samp.order], 1, function(x) { sum(!is.na(x))  })
+for(i in 1:18) { plot(mz.ad[sample(which(foo == n.samps),1),1,samp.order], type="l", xaxt="n") }
+
+ggplot(melt(mz.drifts), aes(x = Var1, y=value, colour=factor(Var2))) + geom_line() + theme_nate()
+```
+
+## Estimate max MZ drift windows
+```{r mz_windows}
+par(mfrow=c(1,2))
+plot(mz.ad.minchain, g.mzs)
+hist(mz.ad.minchain)
+c(quantile(mz.ad.minchain, .01), quantile(mz.ad.minchain, .99))
+```
+
