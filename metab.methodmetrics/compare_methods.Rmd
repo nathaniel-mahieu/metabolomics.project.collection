@@ -1,0 +1,111 @@
+# Credentialed Feature Based Method Comparison
+
+## Background
+```{r}
+head(methodstats_a)
+head(methodstats_b)
+```
+
+## Credentialed Features
+```{r}
+
+nrow(cfs_a)
+nrow(cfs_b)
+
+```
+
+## Total Features
+```{r}
+
+nrow(xs_a@peaks)
+nrow(xs_b@peaks)
+
+```
+
+## Signal to Noise
+```{r echo=FALSE, warning=FALSE, fig.align='center'}
+  ggplot() +
+    geom_density(data = cred_peakstats, aes(x=log10(sn), fill=method), alpha=.3, adjust = 0.6) + 
+    geom_vline(data = cred_means, aes(xintercept=log.sn,  colour=method), linetype="dashed", size=1)
+
+  ggplot() +
+    geom_density(data = peakstats, aes(x=log10(sn), fill=method), alpha=.3, adjust = 0.6) + 
+    geom_vline(data = means, aes(xintercept=log.sn,  colour=method), linetype="dashed", size=1)
+
+ggplot() + 
+  geom_histogram(data=peakchanges, aes(x=log10(sn)), binwidth=.03) + 
+  ggtitle("SN Ratio B/A") + 
+  xlim(-1,1) + 
+  geom_vline(xintercept=0)
+```
+
+## Sensitivity
+```{r echo=FALSE, warning=FALSE, fig.align='center'}
+  ggplot() +
+    geom_density(data = cred_peakstats, aes(x=log10(maxo), fill=method), alpha=.3, adjust = 0.6) + 
+    geom_vline(data = cred_means, aes(xintercept=log.maxo,  colour=method), linetype="dashed", size=1)
+
+  ggplot() +
+    geom_density(data = peakstats, aes(x=log10(maxo), fill=method), alpha=.3, adjust = 0.6) + 
+    geom_vline(data = means, aes(xintercept=log.maxo,  colour=method), linetype="dashed", size=1)
+
+ggplot() + 
+  geom_histogram(data=peakchanges, aes(x=log10(maxo)), binwidth=.03) + 
+  ggtitle("maxo Ratio B/A") + 
+  xlim(-1,1) + 
+  geom_vline(xintercept=0)
+
+ggplot() + 
+  geom_histogram(data=peakchanges, aes(x=log10(into)), binwidth=.03) + 
+  ggtitle("into Ratio B/A") + 
+  xlim(-1,1) + 
+  geom_vline(xintercept=0)
+
+```
+
+## Number of Eluting Compounds
+```{r}
+  ggplot(cred_peakstats, aes(x=rt, fill=method)) +     
+    geom_density(alpha=.3, adjust = .08)
+```
+
+
+## Tailing
+```{r echo=FALSE, warning=FALSE, fig.align='center'}
+  ggplot() +
+    geom_density(data = cred_peakstats, aes(x=log10(tailing), fill=method), alpha=.3, adjust = 0.6) + 
+    geom_vline(data = cred_means, aes(xintercept=log.tailing,  colour=method), linetype="dashed", size=1)
+
+  ggplot() +
+    geom_density(data = peakstats, aes(x=log10(tailing), fill=method), alpha=.3, adjust = 0.6) + 
+    geom_vline(data = means, aes(xintercept=log.tailing,  colour=method), linetype="dashed", size=1)
+
+ggplot() + 
+  geom_histogram(data=peakchanges, aes(x=log10(tailing)), binwidth=.03) + 
+  ggtitle("Tailing Ratio B/A") + 
+  xlim(-1,1) + 
+  geom_vline(xintercept=0)
+```
+
+## Peakwidth
+```{r echo=FALSE, warning=FALSE, fig.align='center'}
+  ggplot() +
+    geom_density(data = cred_peakstats, aes(x=fwhm, fill=method), alpha=.3, adjust = 0.6) + 
+    geom_vline(data = cred_means, aes(xintercept=fwhm,  colour=method), linetype="dashed", size=1)
+
+  ggplot() +
+    geom_density(data = peakstats, aes(x=log10(fwhm), fill=method), alpha=.3, adjust = 0.6) + 
+    geom_vline(data = means, aes(xintercept=fwhm,  colour=method), linetype="dashed", size=1)
+
+ggplot() + 
+  geom_histogram(data=peakchanges, aes(x=fwhm), binwidth=.03) + 
+  ggtitle("FWHM Ratio B/A")
+```
+
+
+## Adduct Stats
+
+## Compiled Data
+```{r}
+head(cred_peakstats)
+```

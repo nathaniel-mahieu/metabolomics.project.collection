@@ -1,0 +1,175 @@
+# Instrument Mass Accuracy Assessment
+```{r, echo=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, error=FALSE, fig.width = 10, fig.align='center')
+```
+
+```{r, cache=FALSE, results='hide'}
+library(credential)
+library(ggplot2)
+library(metab.tools)
+
+an = loadAn("credential_1421696682/xsAnnotate.Rdata")
+sample = an@xcmsSet@peaks[,"sample"]
+pa = data.frame(an@xcmsSet@peaks[sample==1,,drop=F])
+pb = data.frame(an@xcmsSet@peaks[sample==2,,drop=F])
+cfs = read.csv("credential_1421696682/credentialed_features_raw_data")
+
+theme_update(plot.title = element_text(lineheight=.8, face="bold"))
+```
+
+# Mass drift between samples A and B
+
+```{r}
+pnsa = c(cfs[,"master_peaknum_a"], cfs[,"peaknum_a"])
+pnsb = c(cfs[,"master_peaknum_b"], cfs[,"peaknum_b"])
+
+ppmsab = data.frame(
+  ppm = (pa[pnsa, "mz"] - pb[pnsb, "mz"]) / pa[pnsa, "mz"] * 1E6,
+  pa[pnsa, c("rt", "maxo", "mz")]
+  )
+
+ggplot(ppmsab, aes(x=mz, y=ppm, colour=log10(maxo))) +
+  geom_point() +
+  ggtitle("m/z vs ppm drift") +
+  geom_smooth()
+
+ggplot(ppmsab, aes(x=log10(maxo), y=ppm, colour=mz)) +
+  geom_point() + 
+  ggtitle("Maxo vs ppm drift") +
+  geom_smooth()
+
+```
+
+### Mass drift between samples A and B, fine rt scale
+```{r, fig.width = 12, fig.height = 10}
+fit = kmeans(ppmsab[,"rt"], 25)
+ppmsab = cbind(ppmsab, cluster = fit$cluster)
+
+ggplot(ppmsab, aes(x=rt, y=ppm, colour=mz)) +
+  geom_point() +
+  ggtitle("rt vs drift in isotope mass error") +
+  geom_smooth() + facet_wrap( ~ cluster, ncol=5, scales="free_x")
+
+```
+
+# Scan to scan variation in credentialed peaks
+### ppm
+```{r}
+
+pns = c(cfs[,"master_peaknum_a"], cfs[,"peaknum_a"])
+ppms_scan = data.frame(
+  ppm = (pa[pns, "mzmax"] - pa[pns, "mzmin"])/pa[pns, "mz"]*1E6,
+  pa[pns, c("rt", "mz", "maxo")]
+  )
+
+ggplot(ppms_scan, aes(x=mz, y=ppm, colour=log10(maxo))) +
+  geom_point() +
+  ggtitle("m/z vs scan to scan ppm variation") +
+  geom_smooth()
+
+ggplot(ppms_scan, aes(x=log10(maxo), y=ppm, colour=mz)) +
+  geom_point() +
+  ggtitle("Maxo vs scan to scan ppm variation") +
+  geom_smooth()
+
+```
+
+### Delta mz
+
+```{r}
+pns = c(cfs[,"master_peaknum_a"], cfs[,"peaknum_a"])
+ppms_scan = data.frame(
+  dmz = (pa[pns, "mzmax"] - pa[pns, "mzmin"]),
+  pa[pns, c("rt", "mz", "maxo")]
+  )
+
+ggplot(ppms_scan, aes(x=mz, y=dmz, colour=log10(maxo))) +
+  geom_point() +
+  ggtitle("m/z vs scan to scan m/z variation") +
+  geom_smooth()
+
+ggplot(ppms_scan, aes(x=log10(maxo), y=dmz, colour=mz)) +
+  geom_point() +
+  ggtitle("Maxo vs scan to scan m/z variation") +
+  geom_smooth()
+
+```
+
+# Within scan isotope m/z error
+```{r, echo=FALSE}
+ppm_from_13C = function (m1, m2, charge = 1) {
+  isotope_predicted_carbons = round(abs(m1 - m2) * charge/(aC13 - aC12))
+  isotope_predicted_mass = isotope_predicted_carbons * (aC13 - aC12)/charge + m1
+  return((m2 - isotope_predicted_mass)/isotope_predicted_mass * 1e+06)
+}
+```
+
+
+```{r}
+pns_12 = c(cfs[,"master_peaknum_a"])
+pns_13 = c(cfs[,"peaknum_a"])
+
+ppms_iso = data.frame(
+  ppm = ppm_from_13C(pa[pns_12, "mz"], pa[pns_13, "mzmin"], cfs[,"p_charge_a"]),
+  pa[pns_12, c("rt", "mz", "maxo")]
+  )
+
+ggplot(ppms_iso, aes(x=mz, y=ppm, colour=log10(maxo))) +
+  geom_point() +
+  ggtitle("m/z vs error in isotope mass") +
+  geom_smooth()
+
+ggplot(ppms_iso, aes(x=log10(maxo), y=ppm, colour=mz)) +
+  geom_point() +
+  ggtitle("Maxo vs error in isotope mass") +
+  geom_smooth()
+
+```
+
+
+#Across sample isotope error drift
+```{r}
+pns_12 = c(cfs[,"master_peaknum_a"])
+pns_13 = c(cfs[,"peaknum_a"])
+
+pns_12b = c(cfs[,"master_peaknum_b"])
+pns_13b = c(cfs[,"peaknum_b"])
+
+ppms_iso = data.frame(
+  ppm_a = ppm_from_13C(pa[pns_12, "mz"], pa[pns_13, "mzmin"], cfs[,"p_charge_a"]),
+  ppm_b = ppm_from_13C(pb[pns_12b, "mz"], pb[pns_13b, "mzmin"], cfs[,"p_charge_a"]),
+  pa[pns_12, c("rt", "mz", "maxo")]
+  )
+
+ggplot(ppms_iso, aes(x=mz, y=ppm_a-ppm_b, colour=log10(maxo))) +
+  geom_point() +
+  ggtitle("m/z vs drift in isotope mass error") +
+  geom_smooth() 
+
+ggplot(ppms_iso, aes(x=log10(maxo), y=ppm_a-ppm_b, colour=mz)) +
+  geom_point() +
+  ggtitle("Maxo vs drift in isotope mass error") +
+  geom_smooth()
+
+
+```
+
+###Across sample isotope error drift, fine rt scale
+```{r, fig.width = 12, fig.height = 10}
+fit = kmeans(ppms_iso[,"rt"], 20)
+
+ppms_iso = cbind(ppms_iso, cluster = fit$cluster)
+
+ggplot(ppms_iso, aes(x=rt, y=ppm_a-ppm_b, colour=mz)) +
+  geom_point() +
+  ggtitle("rt vs drift in isotope mass error") +
+  geom_smooth() + facet_wrap( ~ cluster, ncol=5, scales="free_x")
+
+
+ggplot(ppms_iso, aes(x=rt, y=ppm_a, colour=mz)) +
+  geom_point() +
+  ggtitle("rt vs drift in isotope mass error") +
+  geom_smooth() + facet_wrap( ~ cluster, ncol=5, scales="free_x")
+
+```
+
